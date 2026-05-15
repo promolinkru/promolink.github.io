@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>RaceMann Live Monitor — Пилоты / Сессии / Остаток</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Roboto', 'Noto Sans', sans-serif;
+        }
+
+        body {
+            background: #0a0f1c;
+            margin: 0;
+            padding: 24px 20px;
+            color: #eef2ff;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(18, 25, 45, 0.85);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            padding: 1.5rem 1.8rem;
+            margin-bottom: 1.8rem;
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.5);
+            border: 1px solid rgba(66, 153, 225, 0.3);
+            transition: all 0.2s;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 1.25rem;
+            border-left: 5px solid #3b82f6;
+            padding-left: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 1.8rem;
+        }
+
+        @media (max-width: 780px) {
+            .grid-2col {
+                grid-template-columns: 1fr;
+                gap: 1.2rem;
+            }
+            body { padding: 16px; }
+            .card { padding: 1.2rem; }
+        }
+
+        select, input, button {
+            background: #111827;
+            border: 1px solid #2d3a5e;
+            color: #f0f4ff;
+            padding: 0.7rem 1rem;
+            border-radius: 1.5rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: 0.2s;
+            width: 100%;
+        }
+
+        button {
+            background: #2563eb;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .info-panel {
+            background: #0f172ad9;
+            border-radius: 1.5rem;
+            padding: 1.2rem 1.5rem;
+            margin-top: 1rem;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.65rem 0;
+            border-bottom: 1px solid #1e2a4a;
+            font-size: 1rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .stat-label {
+            font-weight: 500;
+            color: #9ab3d5;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-family: monospace;
+            font-size: 1.1rem;
+            letter-spacing: 0.3px;
+            color: #cbd5ff;
+            word-break: break-word;
+            text-align: right;
+        }
+
+        .badge {
+            background: #1e293b;
+            border-radius: 2rem;
+            padding: 0.2rem 0.8rem;
+            font-size: 0.75rem;
+            display: inline-block;
+        }
+
+        .remaining-box {
+            background: #02061770;
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 1.2rem;
+        }
+
+        .driver-name {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #94a3f8, #3b82f6);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .warning {
+            color: #facc15;
+        }
+
+        .error-text {
+            color: #ff8a7a;
+            background: #2c1a1f;
+            border-radius: 1rem;
+            padding: 0.5rem 1rem;
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .live-badge {
+            background: #10b98130;
+            color: #6ee7b7;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.7rem;
+            font-weight: normal;
+        }
+
+        hr {
+            border-color: #1f2a44;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.75rem;
+            opacity: 0.6;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="card-title">
+            🏁 RaceMann Live Tracker
+            <span class="live-badge" id="liveStatusBadge">⚫ Неактивно</span>
+        </div>
+        <div class="grid-2col">
+            <!-- Левая панель: ссылка / выбор команды / настройки -->
+            <div>
+                <label style="font-weight: 500;">🔗 Ссылка на гонку (пример: https://academy.racemann.com/race/88435b54-59b9-4643-ac7c-d2bdb1d93fda)</label>
+                <div class="flex-row" style="margin: 8px 0 12px 0;">
+                    <input type="text" id="raceUrlInput" placeholder="Вставьте URL гонки ..." style="flex:3;">
+                    <button id="loadByUrlBtn" style="flex:1; background:#3b82f6;">📥 Загрузить</button>
+                </div>
+                <div id="urlFeedback" class="badge" style="margin-bottom: 1rem; display: inline-block; background:#0f172a;"></div>
+
+                <label style="font-weight: 500; margin-top: 0.8rem; display: block;">🚗 Выберите команду</label>
+                <select id="teamSelect" disabled style="margin: 6px 0 1.2rem 0;">
+                    <option value="">-- Сначала загрузите данные по ссылке --</option>
+                </select>
+
+                <label style="font-weight: 500;">⏱️ Лимит сессии (минуты)</label>
+                <div style="display: flex; gap: 10px; margin: 6px 0 12px 0;">
+                    <input type="number" id="sessionMinutes" value="35" step="1" min="1" max="180" style="flex:2;">
+                    <button id="manualRefreshBtn" style="flex:1;">🔄 Пересчёт</button>
+                </div>
+                
+                <div class="info-panel" style="margin-top: 0.5rem; background:#0b1120;">
+                    <div class="stat-row"><span class="stat-label">🕒 Обновление данных:</span><span class="stat-value" id="lastUpdateTime">—</span></div>
+                    <div class="stat-row"><span class="stat-label">📡 Статус:</span><span class="stat-value" id="fetchStatus">Ожидание ссылки</span></div>
+                    <div class="stat-row"><span class="stat-label">🏎️ Гоночное время:</span><span class="stat-value" id="globalRaceTime">—</span></div>
+                </div>
+            </div>
+
+            <!-- Правая панель: данные пилота -->
+            <div class="info-panel" style="background: #0b1120;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <span style="font-size: 1.8rem;">🏎️</span>
+                    <span style="font-weight: 300;">ТЕКУЩАЯ СЕССИЯ / ПИЛОТ</span>
+                </div>
+                <div id="driverInfo" style="margin-top: 0.8rem;">
+                    <div class="stat-row"><span class="stat-label">Пилот на трассе:</span><span class="stat-value">—</span></div>
+                    <div class="stat-row"><span class="stat-label">Команда / Номер:</span><span class="stat-value">—</span></div>
+                    <div class="stat-row"><span class="stat-label">Кругов проехал (всего):</span><span class="stat-value">—</span></div>
+                    <div class="stat-row"><span class="stat-label">Кругов в текущей сессии:</span><span class="stat-value">—</span></div>
+                    <div class="stat-row"><span class="stat-label">⏱️ Длительность текущего отрезка:</span><span class="stat-value" id="currentStintDuration">—</span></div>
+                    <div class="stat-row"><span class="stat-label">📊 Среднее время круга (сек):</span><span class="stat-value">—</span></div>
+                </div>
+                <div id="remainingBlock" class="remaining-box">
+                    <div class="stat-row"><span class="stat-label">⏳ Осталось ехать (лимит сессии):</span><span class="stat-value" id="timeLeft">—</span></div>
+                    <div class="stat-row"><span class="stat-label">🔄 Осталось кругов (по среднему кругу):</span><span class="stat-value" id="lapsLeft">—</span></div>
+                    <div class="stat-row"><span class="stat-label">📌 Заданный лимит сессии:</span><span class="stat-value" id="sessionLimitLabel">—</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- подсказки -->
+    <div class="card" style="background: #0c1122;">
+        <div class="card-title">📋 Как это работает</div>
+        <ul style="margin: 0; padding-left: 1.2rem; line-height: 1.5;">
+            <li>✅ Вставьте ссылку вида <code>https://academy.racemann.com/race/UUID</code> → автоматически извлекается <strong>UUID</strong>.</li>
+            <li>✅ POST-запрос на <code>https://academy.racemann.com/race/GetRaceStartData</code> с телом <code>{"raceId":"UUID"}</code> получает JSON гонки.</li>
+            <li>✅ После успешной загрузки данные обновляются <strong>каждые 5 секунд</strong> (пока активна гонка).</li>
+            <li>✅ Выберите команду → увидете пилота на трассе, время текущего отрезка, остаток кругов/времени по вашему лимиту сессии.</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    // Глобальные переменные
+    let currentRaceData = null;       // храним весь объект гонки (comps, sessions, raceData)
+    let currentSelectedRn = null;     // выбранная команда (rn)
+    let updateInterval = null;         // интервал обновления 5 сек
+    let isFetching = false;            // защита от параллельных запросов
+    let raceIdLoaded = null;           // последний загруженный raceId
+
+    // DOM элементы
+    const teamSelect = document.getElementById('teamSelect');
+    const sessionMinutesInput = document.getElementById('sessionMinutes');
+    const manualRefreshBtn = document.getElementById('manualRefreshBtn');
+    const loadByUrlBtn = document.getElementById('loadByUrlBtn');
+    const raceUrlInput = document.getElementById('raceUrlInput');
+    const urlFeedback = document.getElementById('urlFeedback');
+    const fetchStatusSpan = document.getElementById('fetchStatus');
+    const lastUpdateSpan = document.getElementById('lastUpdateTime');
+    const globalRaceTimeSpan = document.getElementById('globalRaceTime');
+    const liveStatusBadge = document.getElementById('liveStatusBadge');
+    
+    // --- утилиты форматирования ---
+    function formatDuration(ms) {
+        if (ms === undefined || ms === null || isNaN(ms)) return "—";
+        const absMs = Math.abs(ms);
+        const totalSeconds = Math.floor(absMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const sign = ms < 0 ? "-" : "";
+        return `${sign}${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    }
+
+    function formatTimeFromMs(ms) {
+        if (ms < 0) return `-${formatDuration(-ms)}`;
+        return formatDuration(ms);
+    }
+
+    // Извлечение UUID из ссылки RaceMann
+    function extractUuidFromUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathSegments = urlObj.pathname.split('/').filter(seg => seg.length > 0);
+            // формат /race/88435b54-59b9-4643-ac7c-d2bdb1d93fda
+            if (pathSegments.length >= 2 && pathSegments[0].toLowerCase() === 'race') {
+                const candidate = pathSegments[1];
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (uuidRegex.test(candidate)) return candidate;
+            }
+            // если передали просто uuid как строку
+            const uuidRegexStrict = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRegexStrict.test(url.trim())) return url.trim();
+            return null;
+        } catch(e) {
+            // может быть прямая строка uuid
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(url.trim())) return url.trim();
+            return null;
+        }
+    }
+
+    // POST запрос к API
+    async function fetchRaceDataByRaceId(raceId) {
+        const apiUrl = 'https://academy.racemann.com/race/GetRaceStartData';
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ raceId: raceId })
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            const data = await response.json();
+            // ожидаем, что ответ содержит comps, sessions, raceData (структура как в примере)
+            if (data && (data.comps || data.sessions)) {
+                return data;
+            } else {
+                throw new Error('Неверная структура ответа: отсутствуют comps/sessions');
+            }
+        } catch (err) {
+            console.error('API fetch error:', err);
+            throw err;
+        }
+    }
+
+    // Получить последнюю сессию команды (по ss)
+    function getCurrentSessionForTeam(rn, sessionsArray) {
+        if (!sessionsArray || !rn) return null;
+        const teamSessions = sessionsArray.filter(s => s.rn === rn && s.drv && s.ss !== undefined);
+        if (teamSessions.length === 0) return null;
+        teamSessions.sort((a,b) => b.ss - a.ss);
+        return teamSessions[0];
+    }
+
+    // Получить команду по rn
+    function getTeamByRn(rn, compsArray) {
+        if (!compsArray) return null;
+        return compsArray.find(c => c.rn === rn);
+    }
+
+    // Обновление UI на основе текущих данных и выбранной команды / лимита минут
+    function refreshDisplayFromCurrentData() {
+        if (!currentRaceData || !currentSelectedRn) {
+            // если нет данных, показываем заглушку в driverInfo
+            if (!currentRaceData) {
+                document.getElementById('driverInfo').innerHTML = `<div class="stat-row"><span class="stat-label">Пилот на трассе:</span><span class="stat-value">Нет данных гонки</span></div>`;
+                document.getElementById('timeLeft').innerText = '—';
+                document.getElementById('lapsLeft').innerText = '—';
+            }
+            return;
+        }
+        
+        const comps = currentRaceData.comps || [];
+        const sessions = currentRaceData.sessions || [];
+        const raceTime = currentRaceData.raceData?.RaceTime || 0;
+        
+        const team = getTeamByRn(currentSelectedRn, comps);
+        if (!team) {
+            document.getElementById('driverInfo').innerHTML = `<div class="stat-row"><span class="stat-label">Пилот на трассе:</span><span class="stat-value">Команда не найдена</span></div>`;
+            return;
+        }
+        
+        const session = getCurrentSessionForTeam(currentSelectedRn, sessions);
+        if (!session) {
+            document.getElementById('driverInfo').innerHTML = `<div class="stat-row"><span class="stat-label">Пилот на трассе:</span><span class="stat-value">Нет активной сессии</span></div>`;
+            return;
+        }
+        
+        const currentDriver = session.drv || '—';
+        const teamName = team.fn || '—';
+        const carNumber = team.nn || '—';
+        const totalLaps = team.lc || 0;
+        const stintStartLap = session.ssl || 0;
+        const stintEndLap = session.sll || totalLaps;
+        const lapsInCurrentStint = stintEndLap - stintStartLap;
+        
+        const stintStartMs = session.ss;
+        const currentStintDurationMs = raceTime - stintStartMs;
+        const avgLapMs = session.al3 || team.cs?.al3 || 22000;
+        const avgLapSeconds = (avgLapMs / 1000).toFixed(2);
+        
+        let sessionMinutesLimit = parseFloat(sessionMinutesInput.value);
+        if (isNaN(sessionMinutesLimit) || sessionMinutesLimit <= 0) sessionMinutesLimit = 35;
+        const sessionLimitMs = sessionMinutesLimit * 60 * 1000;
+        const remainingTimeMs = sessionLimitMs - currentStintDurationMs;
+        const isOvertime = remainingTimeMs < 0;
+        
+        let timeLeftStr = formatDuration(Math.abs(remainingTimeMs));
+        if (isOvertime) timeLeftStr = `Перегрузка +${timeLeftStr}`;
+        else timeLeftStr = `Осталось ${timeLeftStr}`;
+        
+        let lapsRemaining = 0;
+        if (remainingTimeMs > 0 && avgLapMs > 0) {
+            lapsRemaining = Math.floor(remainingTimeMs / avgLapMs);
+        } else if (remainingTimeMs <= 0) {
+            lapsRemaining = 0;
+        }
+        
+        // Обновляем панель пилота
+        const driverHtml = `
+            <div class="stat-row"><span class="stat-label">Пилот на трассе:</span><span class="stat-value driver-name">${escapeHtml(currentDriver)}</span></div>
+            <div class="stat-row"><span class="stat-label">Команда / Номер:</span><span class="stat-value">${escapeHtml(teamName)} &nbsp;| №${escapeHtml(carNumber)}</span></div>
+            <div class="stat-row"><span class="stat-label">Кругов проехал (всего):</span><span class="stat-value">${totalLaps}</span></div>
+            <div class="stat-row"><span class="stat-label">Кругов в текущей сессии:</span><span class="stat-value">${lapsInCurrentStint >= 0 ? lapsInCurrentStint : '—'}</span></div>
+            <div class="stat-row"><span class="stat-label">⏱️ Длительность текущего отрезка:</span><span class="stat-value">${formatDuration(currentStintDurationMs)}</span></div>
+            <div class="stat-row"><span class="stat-label">📊 Среднее время круга (сек):</span><span class="stat-value">${avgLapSeconds} сек</span></div>
+        `;
+        document.getElementById('driverInfo').innerHTML = driverHtml;
+        document.getElementById('timeLeft').innerHTML = timeLeftStr;
+        document.getElementById('lapsLeft').innerHTML = `${lapsRemaining} кругов`;
+        document.getElementById('sessionLimitLabel').innerHTML = `${sessionMinutesLimit} мин (${formatDuration(sessionLimitMs)})`;
+        
+        const timeLeftSpan = document.getElementById('timeLeft');
+        if (isOvertime) timeLeftSpan.style.color = "#f97316";
+        else timeLeftSpan.style.color = "#bbf0ff";
+        
+        // отображение глобального гоночного времени
+        if (currentRaceData.raceData?.RaceTime !== undefined) {
+            globalRaceTimeSpan.innerText = formatDuration(currentRaceData.raceData.RaceTime);
+        }
+    }
+    
+    // вспомогательная защита от XSS
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    // Заполнение выпадающего списка команд
+    function populateTeamSelect(compsArray) {
+        teamSelect.innerHTML = '<option value="">-- Выберите команду --</option>';
+        if (!compsArray || compsArray.length === 0) {
+            teamSelect.disabled = true;
+            return;
+        }
+        compsArray.forEach(comp => {
+            const option = document.createElement('option');
+            option.value = comp.rn;
+            const driverName = comp.cs?.drv || 'пилот неизвестен';
+            option.textContent = `${comp.fn || 'Команда'} (№${comp.nn || '?'}) — ${driverName}`;
+            teamSelect.appendChild(option);
+        });
+        teamSelect.disabled = false;
+        if (compsArray.length > 0 && !currentSelectedRn) {
+            currentSelectedRn = compsArray[0].rn;
+            teamSelect.value = currentSelectedRn;
+        } else if (currentSelectedRn && document.querySelector(`option[value="${currentSelectedRn}"]`)) {
+            teamSelect.value = currentSelectedRn;
+        } else if (compsArray.length > 0) {
+            currentSelectedRn = compsArray[0].rn;
+            teamSelect.value = currentSelectedRn;
+        }
+        refreshDisplayFromCurrentData();
+    }
+    
+    // Основная функция загрузки данных по raceId и обновление интерфейса
+    async function loadRaceData(raceId, isAutoRefresh = false) {
+        if (isFetching) return;
+        isFetching = true;
+        fetchStatusSpan.innerText = isAutoRefresh ? "Обновление..." : "Загрузка...";
+        try {
+            const data = await fetchRaceDataByRaceId(raceId);
+            currentRaceData = data;
+            raceIdLoaded = raceId;
+            lastUpdateSpan.innerText = new Date().toLocaleTimeString();
+            fetchStatusSpan.innerText = `✅ Данные загружены (${new Date().toLocaleTimeString()})`;
+            liveStatusBadge.innerText = '🟢 Live 5с';
+            liveStatusBadge.style.background = '#10b98130';
+            // обновляем селектор команд
+            populateTeamSelect(currentRaceData.comps || []);
+            // пересчет после загрузки
+            refreshDisplayFromCurrentData();
+        } catch (err) {
+            console.error('loadRaceData error:', err);
+            fetchStatusSpan.innerText = `❌ Ошибка: ${err.message}`;
+            liveStatusBadge.innerText = '🔴 Ошибка';
+            liveStatusBadge.style.background = '#b91c1c30';
+            if (!isAutoRefresh) {
+                urlFeedback.innerText = `Ошибка загрузки: ${err.message}`;
+                urlFeedback.style.color = "#ff8a7a";
+            }
+        } finally {
+            isFetching = false;
+        }
+    }
+    
+    // Остановка интервала обновления, если есть
+    function stopAutoRefresh() {
+        if (updateInterval) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+            liveStatusBadge.innerText = '⚫ Пауза';
+            liveStatusBadge.style.background = '#47556930';
+        }
+    }
+    
+    function startAutoRefresh(raceId) {
+        stopAutoRefresh();
+        if (!raceId) return;
+        // запускаем обновление каждые 5 секунд
+        updateInterval = setInterval(() => {
+            if (raceIdLoaded === raceId) {
+                loadRaceData(raceId, true);
+            } else {
+                // если raceId сменился, остановим старый интервал
+                stopAutoRefresh();
+            }
+        }, 5000);
+    }
+    
+    // обработчик загрузки по URL
+    async function onLoadFromUrl() {
+        const rawUrl = raceUrlInput.value.trim();
+        if (!rawUrl) {
+            urlFeedback.innerText = 'Введите ссылку или UUID';
+            urlFeedback.style.color = "#facc15";
+            return;
+        }
+        const uuid = extractUuidFromUrl(rawUrl);
+        if (!uuid) {
+            urlFeedback.innerText = '❌ Не удалось извлечь UUID (пример: /race/88435b54-... или прямой UUID)';
+            urlFeedback.style.color = "#ff8a7a";
+            return;
+        }
+        urlFeedback.innerText = `🔍 UUID: ${uuid} → загрузка...`;
+        urlFeedback.style.color = "#9ab3d5";
+        // сброс старых данных
+        stopAutoRefresh();
+        currentRaceData = null;
+        currentSelectedRn = null;
+        teamSelect.innerHTML = '<option value="">-- Загрузка данных --</option>';
+        teamSelect.disabled = true;
+        
+        try {
+            await loadRaceData(uuid, false);
+            // после успешной первой загрузки запускаем автообновление
+            startAutoRefresh(uuid);
+            urlFeedback.innerText = `✅ Гонка загружена. Автообновление каждые 5 секунд.`;
+            urlFeedback.style.color = "#6ee7b7";
+        } catch(e) {
+            urlFeedback.innerText = `Ошибка: ${e.message}`;
+            urlFeedback.style.color = "#ff8a7a";
+        }
+    }
+    
+    // обработчик ручного пересчёта (без запроса к серверу)
+    function onManualRecalc() {
+        if (currentRaceData && currentSelectedRn) {
+            refreshDisplayFromCurrentData();
+            fetchStatusSpan.innerText = `🔄 Пересчёт (${new Date().toLocaleTimeString()})`;
+        } else {
+            fetchStatusSpan.innerText = "Нет загруженных данных";
+        }
+    }
+    
+    // Смена команды
+    function onTeamChange() {
+        const newRn = teamSelect.value;
+        if (newRn) {
+            currentSelectedRn = newRn;
+            refreshDisplayFromCurrentData();
+        } else {
+            currentSelectedRn = null;
+            document.getElementById('driverInfo').innerHTML = `<div class="stat-row"><span class="stat-label">Пилот на трассе:</span><span class="stat-value">—</span></div>`;
+        }
+    }
+    
+    // инициализация событий
+    function initEventHandlers() {
+        loadByUrlBtn.addEventListener('click', onLoadFromUrl);
+        manualRefreshBtn.addEventListener('click', onManualRecalc);
+        teamSelect.addEventListener('change', onTeamChange);
+        sessionMinutesInput.addEventListener('input', () => {
+            if (currentRaceData && currentSelectedRn) refreshDisplayFromCurrentData();
+        });
+    }
+    
+    // начальное состояние
+    initEventHandlers();
+    teamSelect.disabled = true;
+    liveStatusBadge.innerText = '⚫ Ожидание ссылки';
+    fetchStatusSpan.innerText = 'Вставьте ссылку на гонку';
+    globalRaceTimeSpan.innerText = '—';
+</script>
+</body>
+</html>
